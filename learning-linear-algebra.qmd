@@ -11,9 +11,11 @@ format:
     incremental: false
     code-overflow: wrap
     code-copy: true
-    chalkboard: true
+    #chalkboard: true
     toc: false
     progress: true
+    embed-resources: true
+    self-contained-math: true 
 execute:
   echo: true
   warning: false
