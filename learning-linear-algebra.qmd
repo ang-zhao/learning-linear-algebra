@@ -1,0 +1,1825 @@
+---
+title: "Linear Algebra in 1HR"
+subtitle: "Speed Lecture for WIT"
+author: "Angela Zhao"
+date: "Oct. 24, 2025"
+format:
+  revealjs:
+    theme: [default]
+    slide-number: true
+    transition: fade
+    incremental: false
+    code-overflow: wrap
+    code-copy: true
+    chalkboard: true
+    toc: false
+    progress: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## Goals {#First}
+
+- Connect the core ideas of linear algebra to the geometry and concrete applications.
+- Assumes audience has some prior knowledge.
+  - i.e. vector/matrix operations, subspaces, orthogonality, Advanced Methods Term 1
+- Not covered: fundamental subspaces, inverses, determinants, regression (please see [Appendix](#Appendix)).
+
+--- 
+
+## 1. What is a matrix?
+
+- Matrix $A \in \mathbb{R}^{m\times n}$ represents a linear map: $x \mapsto Ax$.
+  - Examples: rotations, scalings, translations
+  
+```{r}
+#| echo: false
+#| fig-height: 8
+#| fig-width: 24
+#| fig-align: center
+
+
+# Rotation matrix visualization
+library(ggplot2); library(grid); library(patchwork); library(tidyverse)
+
+v <- c(1, 0.6)
+theta <- -pi/4  # 45 degrees counterclockwise
+A <- matrix(c(cos(theta), -sin(theta),
+              sin(theta),  cos(theta)), 2, 2)
+Av <- A %*% v
+
+df <- data.frame(
+  x = c(0, 0),
+  y = c(0, 0),
+  xend = c(v[1], Av[1]),
+  yend = c(v[2], Av[2]),
+  type = c("Original", "Rotated")
+)
+
+p_r <- ggplot(df) +
+  # coordinate axes
+  geom_hline(yintercept = 0, color = "black") +
+  geom_vline(xintercept = 0, color = "black") +
+
+  # original and transformed arrows (this uses df)
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend, color = type),
+               arrow = arrow(length = unit(0.02, "npc")), linewidth = 2) +
+
+  # dashed connector between arrow tips (single-row data)
+  geom_segment(
+    data = data.frame(x = v[1], y = v[2], xend = Av[1], yend = Av[2]),
+    aes(x = x, y = y, xend = xend, yend = yend),
+    linetype = "dashed", color = "#7FDBFF", inherit.aes = FALSE
+  ) +
+  geom_point(
+    data = data.frame(x = Av[1], y = Av[2]),
+    aes(x = x, y = y),
+    color = "#7FDBFF", size = 2, inherit.aes = FALSE
+  ) +
+
+  coord_fixed(xlim = c(-1.2, 1.2), ylim = c(-1.2, 1.2)) +
+  scale_color_manual(values = c("Original" = "#AAAAAA", "Rotated" = "#7FDBFF")) +
+  theme_void(base_size = 36) +
+  theme(text = element_text(color = "black"),
+        legend.position = "top",
+        plot.margin = unit(c(0, 100, 0, 0), "pt")) +
+  ggtitle("Rotation by 60°")
+
+# Scaling matrix visualization
+v <- c(1, 0.6)
+A <- diag(c(2, 0.5))
+Av <- A %*% v
+
+df <- data.frame(
+  x = 0, y = 0,
+  xend = c(v[1], Av[1]),
+  yend = c(v[2], Av[2]),
+  type = c("Original", "Scaled")
+)
+
+p_s <- ggplot(df) +
+  geom_hline(yintercept = 0, color = "black") +
+  geom_vline(xintercept = 0, color = "black") +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend, color = type),
+               arrow = arrow(length = unit(0.02, "npc")), linewidth = 2) +
+  annotate("segment", x = v[1], y = v[2], xend = Av[1], yend = Av[2],
+           linetype = "dashed", color = "#2ECC40") +
+  annotate("point", x = Av[1], y = Av[2], color = "#2ECC40", size = 2) +
+  coord_fixed(xlim = c(0, 2), ylim = c(-1.2, 1.2)) +
+  scale_color_manual(values = c("Original" = "#AAAAAA", "Scaled" = "#2ECC40")) +
+  theme_void(base_size = 36) +
+  theme(text = element_text(color = "black"),
+        legend.position = "top",
+        plot.margin = unit(c(0, 100, 0, 0), "pt")) +
+  ggtitle("Scaling by 1.5×")
+
+
+# Transformation matrix visualization
+v <- c(0.7, 0.4)
+t <- c(0.3, -0.2)
+Av <- v + t
+
+df <- data.frame(
+  x = c(0, t[1]),          # Start of each arrow
+  y = c(0, t[2]),
+  xend = c(v[1], Av[1]),   # End of each arrow
+  yend = c(v[2], Av[2]),
+  type = c("Original", "Translated")
+)
+
+p_t <- ggplot(df) +
+  geom_hline(yintercept = 0, color = "black") +
+  geom_vline(xintercept = 0, color = "black") +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend, color = type),
+               arrow = arrow(length = unit(0.02, "npc")), linewidth = 2) +
+  annotate("segment", x = v[1], y = v[2], xend = Av[1], yend = Av[2],
+           linetype = "dashed", color = "darkorange") +
+  annotate("point", x = Av[1], y = Av[2], color = "darkorange", size = 2) +
+  coord_fixed(xlim = c(-1.2, 1.2), ylim = c(-1.2, 1.2)) +
+  scale_color_manual(values = c("Original" = "#AAAAAA", "Translated" = "darkorange")) +
+  theme_void(base_size = 36) +
+  theme(text = element_text(color = "black"),
+        legend.position = "top",
+        plot.margin = unit(c(0, 100, 0, 0), "pt")) +
+  ggtitle("Translation")
+
+(p_r + p_s + p_t) |> print()
+```
+
+
+--- 
+
+We can write a system of equations into the form $Ax = b$.
+
+$$\begin{align} 
+x_1 + x_3 &= 1 \ \ \ \ \ \ \ \ \ \ \text{Eq. 1}  \\ 
+x_1 + 2x_2 + x_3 &= 1 \ \ \ \ \ \ \ \ \ \ \text{Eq. 2}\\ 
+3x_1 + 2x_3  &= 10 \ \ \ \ \ \ \ \ \text{Eq. 3}\\ \\
+\begin{bmatrix} 
+    2 & 1 & 1 \\
+    4 & 3 & 3 \\
+    8 & 7 & 9
+    \end{bmatrix}
+    \begin{bmatrix} 
+    x_1 \\ x_2 \\ x_3 
+    \end{bmatrix} &= 
+    \begin{bmatrix} 
+    1 \\ 1 \\ 10
+    \end{bmatrix} \\ \\
+    Ax &= b 
+    \end{align}$$
+
+::: {.notes}
+Diagonals are pivots. If all pivots are non-zero, then 
+::: 
+---
+
+- Core goal: find $x$ that solves $Ax=b$
+- $Ax=b$ in $\mathbb{R}^2$ can have 0, 1, or infinitely many solutions
+
+---
+
+### Three geometric cases (lines in $\mathbb{R}^2$)
+
+```{r}
+#| echo: false
+#| fig-height: 4
+#| fig-width: 9
+suppressPackageStartupMessages({library(ggplot2)
+                               library(patchwork)})
+p <- ggplot(data.frame(x=c(-2,2)), aes(x=x)) +
+  coord_fixed(xlim=c(-2,2), ylim=c(-2,2)) + theme_minimal(base_size=16) +
+  theme(# panel.background=element_rect(fill="grey", colour=NA),
+  #       plot.background=element_rect(fill="grey", colour=NA),
+        text=element_text(colour="black"),
+        axis.text=element_text(colour="black"),
+        axis.title=element_text(colour="black"))
+p1 = p + geom_abline(intercept=0.5, slope=1, colour="#7FDBFF", linewidth=1.2) +
+    geom_abline(intercept=-0.5, slope=-0.5, colour="darkorange", linewidth=1.2, linetype = "dashed") +
+    ggtitle("Unique solution")
+
+p2 = p + geom_abline(intercept=0.8, slope=1, colour="#7FDBFF", linewidth=1.2) +
+geom_abline(intercept=0.2, slope=1, colour="darkorange", linewidth=1.2, linetype = "dashed") +
+ggtitle("No solution")
+
+p3 = p + geom_abline(intercept=-0.2, slope=0.7, linewidth=1.8, colour="#7FDBFF") +
+geom_abline(intercept=-0.2, slope=0.7, linewidth=1.8, linetype="dashed", colour="darkorange") +
+ggtitle("Infinite solutions")
+
+(p1 + p2 + p3) |> print()
+```
+
+::: {.notes}
+Stress: “Solve $Ax=b$” ≠ “compute $A^{-1}$”. In practice use elimination/factorizations.
+:::
+
+---
+
+# Solving $Ax=b$
+
+---
+
+## Every matrix wants to be diagonal
+
+| Perspective | Object | Geometric meaning |
+|-----------------|--------------------|------------------------------------| 
+| LU | Row operations | Basis change for row space | 
+| QR | Orthogonal projection | Stable coordinate system | 
+| SVD | Singular directions | “Best-fit” basis for both domain & range | 
+
+::: {.notes}
+Diagonal or triangular matrices are easiest to solve. Here are 3 common ways to solve matrices and we will review each of them briefly. 
+:::
+
+---
+
+- LU, QR, and SVD all express the *same geometric truth*.
+
+- We change coordinates to make the system easier to solve.
+
+- Under finite precision, different geometries have different stability.
+
+
+---
+
+## 1. LU Decomposition {#LU}
+
+### Elementary row operations
+
+1. Multiply row $i$ by a constant $K$: $\ \ \ \ \ E = \begin{bmatrix} K & 0  \\0   & 1 \\ \end{bmatrix}$
+
+1. Add multiple of row $i$ to row $j$: $\ \ \ \ \ \ E = \begin{bmatrix} 1 &    0  \\ \alpha &  1  \\ \end{bmatrix}$
+
+1. Row swap $i \leftrightarrow j$:  $\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \  \ \ \ \ \ \ \ \ P = \begin{bmatrix} 0      &  1 \\ 1      & 0   \\ \end{bmatrix}$
+
+---
+
+- Elementary operations transform $A$ into an upper triangular matrix $U$.
+- We can use multiply the inverse elementary operations together in to construct the lower triangular matrix $L$.
+- Normalize $U$ to unit diagonal: $U=\underbrace{D}_{\text{diag}(u_{11},\dots)}\underbrace{U'}_{\text{unit upper}}$ → $A=LDU'$.
+- Triangular systems are easy to solve with back substitution.
+- LDU representation is unique to A.
+
+::: {.notes}
+Assume A does not need any permutations (i.e. full pivots/rank)
+i.e. L is done by removing each of the operations to make U
+:::
+
+```{r, echo = F, eval = F}
+lu_to_ldu <- function(L,U){
+  D <- diag(diag(U))
+  Up <- solve(D) %*% U
+  list(L=L, D=D, Up=Up, A=L %*% D %*% Up)
+}
+lu_to_ldu(L,U)
+```
+
+---
+
+Example: 
+
+<!-- $$A = \begin{bmatrix} 2 & 1 & 1  \\4 & 3 & 3 \\ 8 & 7 & 9 \end{bmatrix}$$ -->
+```{r}
+A <- matrix(c(2,1,1, 4,3,3, 8,7,9), 3, byrow=TRUE); A
+```
+
+::: {.notes}
+Suppose we have matrix A from before. We apply elementary operations to solve.
+:::
+
+---
+
+Define the elementary operations
+```{r}
+E21 <- diag(3); E21[2,1] <- -2; E21 # Subtract 2x Row 1 from Row 2
+E31 <- diag(3); E31[3,1] <- -4; E31 # Subtract 4x Row 1 from Row 3
+E32 <- diag(3); E32[3,2] <- -3; E32 # Subtract 3x Row 2 from Row 3
+```
+
+---
+
+LU decomposition
+```{r}
+(U  <- E32 %*% E31 %*% E21 %*% A) # Upper triangular matrix 
+(L  <- solve(E21) %*% solve(E31) %*% solve(E32)) # product of inverses
+```
+
+---
+
+Extend to LDU decomposition
+
+```{r}
+(D <- diag(diag(U))) # Diagonal elements of U
+(U_unit  <- solve(D) %*% U) # Unit U
+(L  <- solve(E21) %*% solve(E31) %*% solve(E32)) # product of inverses
+```
+
+- The diagonal of D contains the pivots. If any pivot is 0, the system is singular.
+
+
+<!--
+
+- LU decomposition assumes rows are in correct order (i.e. elementary operations cannot be permutations) $\rightarrow PA = LDU$.
+
+
+- To find $A^{-1}$ s.t. $A^{-1}A = I_n$ , just continue applying elementary operations until $U$ becomes $I_n$.
+
+- The inverse of all those elementary operations multiplied together is $A^{-1}$.
+
+- This is not a good way to compute $A^{-1}$. -->
+
+
+---
+
+### LU decomposition visualized
+
+![](figures_for_linear_algebra/lu_good_anim.gif){fig-align="center"}
+
+---
+
+## Application: Predator-Prey Model
+
+```{r, echo = F, results="hide"}
+library(deSolve)
+library(ggplot2)
+library(dplyr)
+library(gganimate)
+
+# Parameters
+params <- c(alpha = 1.0, beta = 0.8, gamma = 1.5, delta = 0.5)
+init   <- c(x = 1, y = 2)
+times  <- seq(0, 30, by = 0.05)
+
+# ODE function
+lotka_volterra <- function(t, state, parms) {
+  with(as.list(c(state, parms)), {
+    dx <- alpha * x - beta * x * y
+    dy <- delta * x * y - gamma * y
+    list(c(dx, dy))
+  })
+}
+
+# Simulate
+out1 <- as.data.frame(ode(y = init, times = times, func = lotka_volterra, parms = params))
+
+# Equilibrium and Jacobian
+x_star <- params["gamma"] / params["delta"]
+y_star <- params["alpha"] / params["beta"]
+J <- matrix(c(params["alpha"] - params["beta"] * y_star,
+              -params["beta"] * x_star,
+               params["delta"] * y_star,
+               params["delta"] * x_star - params["gamma"]), 2, 2, byrow = TRUE)
+eig <- eigen(J)
+
+cat("Eigenvalues:\n"); print(eig$values)
+cat("Eigenvectors:\n"); print(eig$vectors)
+
+# Time-series plot
+p_time = ggplot(out1, aes(time)) +
+  geom_line(aes(y = x, color = "Prey"), linewidth = 1.2) +
+  geom_line(aes(y = y, color = "Predator"), linewidth = 1.2) +
+  scale_color_manual(values = c("#2ECCFA", "#FFB347")) +
+  labs(title = "Predator–prey oscillations",
+       subtitle = expression("Populations follow Lotka–Volterra cycles"),
+       x = "Time", y = "Population", color = NULL) +
+  theme_classic(base_size = 14)
+```
+
+```{r, echo = F}
+#| fig-align: center
+p_time
+```
+
+What is the equilibrium point at which both populations are stable?
+
+:::{.notes}
+Assumptions:
+
+- Prey grow exponentially without predators.
+- Predation increases linearly with both prey and predator populations.
+- There is no resource limit and no predator saturation.
+:::
+
+---
+
+$$
+\frac{dx}{dt} = \alpha x - \beta x y, \qquad
+\frac{dy}{dt} = \delta x y - \gamma y,
+$$
+where
+$\,x(t)$ is the prey population, and $\,y(t)$ is the predator population. The equilibrium point is when $\frac{dx}{dt}=\frac{dy}{dt}=0$. 
+
+\ 
+
+It is easy to solve by hand that the equilibrium is at
+$$
+x^* = \frac{\gamma}{\delta} \qquad
+y^* = \frac{\alpha}{\beta}.
+$$
+
+---
+
+```{r, echo = F, results="hide"}
+library(deSolve)
+library(ggplot2)
+library(dplyr)
+library(gganimate)
+
+# --- Parameters (now includes K and a) ---
+params <- c(alpha = 1.0, beta = 0.8, gamma = 1.5, delta = 0.5,
+            K = 1000.0, a = 0.01)
+
+init   <- c(x = 1, y = 2)
+times  <- seq(0, 30, by = 0.05)
+
+# --- General predator–prey ODE (logistic prey + Holling II response) ---
+lotka_volterra_general <- function(t, state, parms) {
+  with(as.list(c(state, parms)), {
+    denom <- 1 + a * x
+    dx <- alpha * x * (1 - x / K) - beta * x * y / denom
+    dy <- delta * x * y / denom - gamma * y
+    list(c(dx, dy))
+  })
+}
+
+# --- Simulate ---
+out <- as.data.frame(ode(y = init, times = times,
+                         func = lotka_volterra_general, parms = params))
+
+# --- Equilibria ---
+# Always: (0,0) and (K,0)
+eq_list <- list(c(0, 0), c(params["K"], 0))
+
+# Potential interior equilibrium (if feasible)
+delta <- params["delta"]; gamma <- params["gamma"]; a <- params["a"]
+alpha <- params["alpha"]; beta <- params["beta"]; K <- params["K"]
+
+if (delta - gamma * a > 0) {
+  x_star_int <- gamma / (delta - gamma * a)
+  y_star_int <- (1 + a * x_star_int) * alpha * (1 - x_star_int / K) / beta
+  if (x_star_int > 0 && x_star_int < K && y_star_int > 0) {
+    eq_list <- append(eq_list, list(c(x_star_int, y_star_int)))
+  }
+}
+
+# Pack equilibria into a data frame
+eq_df <- do.call(rbind, eq_list) %>%
+  as.data.frame() %>%
+  setNames(c("x", "y")) %>%
+  mutate(label = paste0("Eq ", row_number()))
+
+# --- Jacobian at a chosen equilibrium (use (K,0) by default) ---
+eq_choice <- c(K, 0)  # change to eq_df[3,1:2] if interior exists
+x0 <- eq_choice[1]; y0 <- eq_choice[2]
+den0 <- 1 + a * x0
+
+# Partial derivatives for the general model
+f1x <- alpha * (1 - 2 * x0 / K) - beta * y0 / den0 + beta * x0 * y0 * a / (den0^2)
+f1y <- - beta * x0 / den0
+f2x <-  delta * y0 / den0 - delta * x0 * y0 * a / (den0^2)
+f2y <-  delta * x0 / den0 - gamma
+
+J <- matrix(c(f1x, f1y, f2x, f2y), nrow = 2, byrow = TRUE)
+eig <- eigen(J)
+
+cat("Equilibria:\n"); print(eq_df)
+cat("\nJacobian at chosen equilibrium (K,0):\n"); print(J)
+cat("\nEigenvalues:\n"); print(eig$values)
+cat("Eigenvectors:\n"); print(eig$vectors)
+
+# --- Time-series plot ---
+p_time_c <- ggplot(out, aes(time)) +
+  geom_line(aes(y = x, color = "Prey"), linewidth = 1.2) +
+  geom_line(aes(y = y, color = "Predator"), linewidth = 1.2) +
+  scale_color_manual(values = c("#2ECCFA", "#FFB347")) +
+  labs(title = "Predator–prey dynamics (logistic + Holling II)",
+       subtitle = expression(paste("Parameters: ",
+                                   alpha,"=1, ", beta,"=0.8, ",
+                                   gamma,"=1.5, ", delta,"=0.5, ",
+                                   K,"=1000, ", a,"=0.1")),
+       x = "Time", y = "Population", color = NULL) +
+  theme_classic(base_size = 14)
+
+# Print plot (optional, if your knitting shows graphics)
+# print(p_time)
+```
+
+Define prey carrying capacity $K$ and max predation rate $\frac{x y}{1+a x}$:
+
+$$
+\frac{dx}{dt}=\alpha x\!\left(1-\frac{x}{K}\right) - \beta\,\frac{x y}{1+a x}, \qquad
+\frac{dy}{dt}=\delta\,\frac{x y}{1+a x} - \gamma y.
+$$
+
+```{r, echo = F}
+#| fig-align: center
+p_time_c
+```
+
+:::{.notes}
+Assumptions:
+
+- Prey have a carrying capacity K, and cannot exceed the environment's capacity.
+- Predators can’t eat infinitely fast. Predation rate saturates when prey population is high. *a* controls how fast the rate saturates.
+
+We cannot solve these equations by hand. Use Newton's method.
+:::
+
+---
+
+**Newton's method**
+
+Let $z=\begin{bmatrix}x\\y\end{bmatrix}$ and $f(z)=\begin{bmatrix}f_1(x,y)\\ f_2(x,y)\end{bmatrix}$.
+
+We define the Jacobian $J(x,y)=
+\begin{bmatrix}
+\frac{\partial f_1}{\partial x} & \frac{\partial f_1}{\partial y}\\
+\frac{\partial f_2}{\partial x} & \frac{\partial f_2}{\partial y}
+\end{bmatrix},$
+
+One Newton step solves
+$$
+J(x_k,y_k)\,\Delta z_k \;=\; -\,f(x_k,y_k), 
+\qquad
+z_{k+1}=z_k+\Delta z_k,
+$$
+which we compute efficiently via an LU factorization of $J$.
+
+---
+
+Parameters and initial guess:
+$$
+\alpha=1.0,\ \beta=0.8,\ \gamma=1.5,\ \delta=0.5,\ K=1000,\ a=0.1 \\
+z_0=(x_0,y_0)=(4,2).
+$$
+
+```{r, echo = F}
+#| fig-align: center
+# Newton's method for logistic–Holling predator–prey
+#   dx/dt = alpha*x*(1 - x/K) - beta*x*y/(1 + a*x)
+#   dy/dt = delta*x*y/(1 + a*x) - gamma*y
+# Solve f(x,y) = 0.
+# --- Parameters ---
+params <- list(alpha=1.0, beta=0.8, gamma=1.5, delta=0.5, K=1000, a=0.1)
+
+# --- f(x,y) and J(x,y) for the general model ---
+f_fun <- function(x, y, p=params) {
+  den <- 1 + p$a * x
+  fx  <- p$alpha * x * (1 - x / p$K) - p$beta * x * y / den
+  fy  <- p$delta * x * y / den - p$gamma * y
+  c(fx, fy)
+}
+
+J_fun <- function(x, y, p=params) {
+  den  <- 1 + p$a * x
+  den2 <- den^2
+  # df1/dx
+  f1x <- p$alpha * (1 - 2*x/p$K) - p$beta * y / den + p$beta * x * y * p$a / den2
+  # df1/dy
+  f1y <- - p$beta * x / den
+  # df2/dx
+  f2x <-  p$delta * y / den - p$delta * x * y * p$a / den2
+  # df2/dy
+  f2y <-  p$delta * x / den - p$gamma
+  matrix(c(f1x, f1y, f2x, f2y), nrow=2, byrow=TRUE)
+}
+
+# --- Tiny 2x2 LU solver with partial pivoting ---
+solve_2x2_LU <- function(A, b) {
+  # A = [[a,b],[c,d]]
+  a <- A[1,1]; b12 <- A[1,2]; c <- A[2,1]; d <- A[2,2]
+  # pivot if needed
+  if (abs(a) < abs(c)) {
+    # swap rows of A and b
+    tmpA <- A; A[1,] <- tmpA[2,]; A[2,] <- tmpA[1,]
+    tmpb <- b; b[1] <- tmpb[2]; b[2] <- tmpb[1]
+    a <- A[1,1]; b12 <- A[1,2]; c <- A[2,1]; d <- A[2,2]
+  }
+  if (abs(a) < .Machine$double.eps) stop("Singular Jacobian in Newton step.")
+  # LU (Doolittle): L=[[1,0],[l,1]], U=[[a,b12],[0,u22]]
+  l <- c / a
+  u22 <- d - l * b12
+  if (abs(u22) < .Machine$double.eps) stop("Nearly singular Jacobian (u22≈0).")
+  # forward solve L w = b
+  w1 <- b[1]
+  w2 <- b[2] - l * w1
+  # back solve U x = w
+  x2 <- w2 / u22
+  x1 <- (w1 - b12 * x2) / a
+  c(x1, x2)
+}
+
+# --- Newton with simple backtracking line search ---
+newton_solve <- function(x0, y0, max_iter=50, tol=1e-10, p=params,
+                         ls_c=1e-4, ls_beta=0.5, max_ls=20, verbose=TRUE) {
+  x <- x0; y <- y0
+  hist <- data.frame(iter=0, x=x, y=y, res=norm(f_fun(x,y,p), type="2"))
+  if (verbose) cat(sprintf("iter %2d: x=%.6g, y=%.6g, ||f||=%.6g\n",
+                           0, x, y, hist$res[1]))
+  for (k in 1:max_iter) {
+    f  <- f_fun(x,y,p)
+    J  <- J_fun(x,y,p)
+    # Solve J * dz = -f via 2x2 LU
+    dz <- solve_2x2_LU(J, -f)
+    # Backtracking line search on residual norm
+    t  <- 1.0
+    f0n <- sqrt(sum(f*f))
+    ok <- FALSE
+    for (m in 0:max_ls) {
+      x_try <- x + t * dz[1]
+      y_try <- y + t * dz[2]
+      f_try <- f_fun(x_try, y_try, p)
+      if (sqrt(sum(f_try*f_try)) <= (1 - ls_c*t) * f0n) { ok <- TRUE; break }
+      t <- t * ls_beta
+    }
+    if (!ok) { # fall back if no sufficient decrease
+      x_try <- x + dz[1]; y_try <- y + dz[2]; f_try <- f_fun(x_try,y_try,p)
+    }
+    x <- x_try; y <- y_try
+    res <- sqrt(sum(f_try*f_try))
+    hist <- rbind(hist, data.frame(iter=k, x=x, y=y, res=res))
+    if (verbose) cat(sprintf("iter %2d: x=%.6g, y=%.6g, ||f||=%.6g\n", k, x, y, res))
+    if (res < tol) break
+  }
+  list(solution=c(x=x,y=y), history=hist)
+}
+
+# --- Run Newton from a starting guess ---
+set.seed(1)
+x0 <- 1; y0 <- 1
+ans <- newton_solve(4, 2, max_iter=100, tol=1e-12, verbose=FALSE)
+
+# --- Convergence plot (log scale) ---
+p_conv <- ggplot(ans$history, aes(iter, res)) +
+  geom_point() + geom_line() +
+  scale_y_log10() +
+  labs(title="Newton convergence",
+       x="Iteration", y="Residual ||f(x_k,y_k)||") +
+  theme_classic(base_size = 14)
+
+print(p_conv)
+
+# --- Report solution ---
+#cat("\nEquilibrium found:\n")
+#print(ans$solution)
+
+```
+
+`Equilibrium found: x = 4.29` \ \ `y = 1.78`
+
+---
+
+## Application: Differential equations
+
+We solve the boundary value problem
+$$
+- u''(x) = f(x), \qquad 0 < x < 1,\qquad u(0)=u(1)=0.
+$$
+
+What is $u$?
+
+```{r, echo = F}
+library(Matrix)
+
+# ---- Problem: -u''(x) = f(x), u(0)=u(1)=0 ----
+n  <- 40                       # number of interior points
+h  <- 1/(n + 1)
+x  <- (1:n) * h
+f   <- function(x) exp(2*x) # change RHS here if you like
+b   <- f(x)
+
+# ---- Discretize: tridiagonal Laplacian (Dirichlet BC) ----
+A <- (-1/h^2) * bandSparse(
+  n, n, k = c(-1, 0, 1),
+  diagonals = list(rep(1, n-1), rep(-2, n), rep(1, n-1))
+)
+
+# ---- LU with BOTH permutations ----
+LU <- lu(A)                   # returns L, U, p (rows), q (cols)
+P  <- as(LU@p + 1, "pMatrix")
+Q  <- as(LU@q + 1, "pMatrix") # <- you were missing this line
+
+# Solve: A u = b  <=>  P A Q (Q^{-1}u) = L U (Q^{-1}u) = P b
+y <- solve(LU@L, P %*% b)
+w <- solve(LU@U, y)
+u <- as.numeric(Q %*% w)      # <- apply Q to get u
+
+# ---- Optional exact solution (for f(x)=sin(pi x)) ----
+u_exact <- 0.25 * (1 - exp(2*x) + (exp(2) - 1) * x)
+
+# ---- Panel 2: Discretization: f(x) with grid points ----
+df_disc <- data.frame(x = seq(0, 1, length.out = 400))
+p_disc <- ggplot(df_disc, aes(x, f(x))) +
+  geom_line() +
+  geom_point(data = data.frame(x = x, y = f(x)), aes(x, y), size = 2, color = "plum") +
+  geom_segment(data = data.frame(x = x),
+               aes(x = x, xend = x, y = 0, yend = f(x)), linewidth = 0.25, alpha = 0.5) +
+  scale_x_continuous(breaks = c(0, x[1], x[round(n/2)], x[n], 1),
+                     labels = scales::number_format(accuracy = 0.01)) +
+  labs(title = "Discretization: sampling f(x) on a grid", x = "x", y = "f(x)") +
+  theme_minimal(base_size = 24) +
+  theme(axis.text.x = element_blank()) 
+
+# ---- Panel 3: Matrix A as heatmap of values ----
+mat_to_df <- function(M) {
+  M <- as.matrix(M)
+  data.frame(i = as.vector(row(M)),
+             j = as.vector(col(M)),
+             v = as.vector(M))
+}
+dA <- mat_to_df(A)
+p_A <- ggplot(dA, aes(j, i, fill = v)) +
+  geom_tile() +
+  scale_y_reverse() +
+  scale_fill_gradient2(low = "navy", mid = "white", high = "firebrick",
+                       midpoint = 0) +
+  coord_fixed() +
+  labs(title = "Discrete operator A (finite differences)",
+       x = "column", y = "row", fill = "value") +
+  theme_minimal(base_size = 24) +
+  theme(panel.grid = element_blank())
+
+# ---- Panel 4: Solution u(x) ----
+df_sol <- data.frame(x = x, u = as.numeric(u), u_exact = u_exact)
+p_sol <- ggplot(df_sol, aes(x)) +
+  geom_line(aes(y = u), linewidth = 2, color = "plum") +
+  geom_line(aes(y = u_exact), linewidth = 2, linetype = 2, color = "black") +
+  labs(caption = "Numerical (plum) vs exact (black)",
+       x = "x", y = "u(x)") +
+  theme_classic(base_size = 24)
+
+# ---- Compose: 2x2 grid ----
+# p_disc /
+# (p_A  | p_sol)
+
+```
+
+---
+
+Examples of boundary value problems
+
+::: {.columns}
+
+::: {.column width="50%"}
+![](figures_for_linear_algebra/airplane.png)
+:::
+::: {.column width="50%"}
+![](figures_for_linear_algebra/neuron.png)
+:::
+:::
+
+:::{.notes}
+Flight trajectory.
+Modeling voltage decay along a neuron’s dendrite.
+:::
+
+---
+
+Grid and discretization
+
+<!-- Let $x_i = i h$ for $i=1,\dots,n$, with $h = \frac{1}{n+1}$.
+Using the centered finite difference stencil,-->
+$$- \frac{u_{i-1} - 2 u_i + u_{i+1}}{h^2} = f(x_i), \qquad i=1,\dots,n$$
+
+```{r}
+#| echo: false
+#| fig-height: 6
+#| fig-width: 12
+#| fig-align: center
+p_disc
+```
+
+
+---
+
+In vector form this is $A\,u = b$, where $u=(u_1,\dots,u_n)^\top$, $b_i=f(x_i)$, and
+
+$$
+A = \frac{1}{h^2}\begin{bmatrix}
+-2 & 1  &        &        &   \\
+1  & -2 & 1      &        &   \\
+   & 1  & \ddots & \ddots &   \\
+   &    & \ddots & -2     & 1 \\
+   &    &        & 1      & -2
+\end{bmatrix}.
+$$
+
+---
+
+We solve $A u = b$ (e.g., via sparse LU with permutation). 
+
+\
+
+**Concrete example:** \ \ $u''(x) = f(x) = e^{2x}$. 
+
+The solution that satisfies the differential equation and boundary solutions is
+
+$$u(x) = \frac{1}{4}(1 - e^{2x} + (e^2 -1))$$
+
+Discretizing the equation tells us to solve for the vector $u = (u_1, ..., u_n)^\top$:
+
+$$Au = b = (f(x_1), f(x_2), ..., f(x_n))^\top$$
+
+---
+
+Solving the discretized matrix gives the same result.
+
+```{r}
+#| echo: false
+#| fig-height: 6
+#| fig-width: 12
+#| fig-align: center
+p_sol
+```
+
+
+---
+
+## Numerical pitfalls
+
+**Problem: When rows of $A$ are nearly linearly dependent**
+
+Example:
+
+$$A = \begin{bmatrix} 
+    1 & 1 \\
+    1 & 1 + \epsilon \\
+    \end{bmatrix}
+    = \begin{bmatrix} 
+    1 & 0 \\
+    1 & 1 \\
+    \end{bmatrix}
+    \begin{bmatrix} 
+    1 & 1 \\
+    0 & \epsilon \\
+    \end{bmatrix} = LU$$
+
+When $\epsilon \rightarrow 0$, the second pivot $U_{22} \rightarrow 0$. Tiny pivots flatten the grid into a near-line. Round-off errors explode as $U$ collapses and $L$ re-expands them
+
+---
+
+### LU decomposition when $A$ is ill-conditioned
+
+![](figures_for_linear_algebra/lu_bad_anim.gif){fig-align="center"}
+
+:::{.notes}
+When A maps space to a plane (parallelogram), its two columns point in different directions, so b can be expressed stably as a mix of them — small changes in 
+b cause small changes in x.
+
+When A collapses to a line, both columns point almost the same way, so b lies nearly along one direction — finding the right mix (the x’s) requires huge, canceling coefficients, which blow up small numerical errors.
+:::
+
+---
+
+## 2. QR Decomposition {#QR}
+
+- The previous problem motivates QR Decomposition.
+- QR decomposition works in the column space instead of the row space.
+- We can orthogonalize columns to ensure stability (using Gram-Schmidt algorithm).
+
+---
+
+#### Aside: Projection onto a line; cosine & least squares
+
+For nonzero $a$, project $y$ onto the coordinates of $a$:
+$$
+\hat{y} = \frac{a^\top y}{a^\top a}\; a, \qquad \cos\theta=\frac{a^\top y}{\|a\|\,\|y\|}.
+$$
+
+```{r}
+a <- c(2,1); y <- c(1,2)
+yhat <- (sum(a*y)/sum(a*a))*a
+cbind(a,y,yhat)
+```
+
+The least‑squares problem $\min_x \|Ax-b\|_2$ is an orthogonal projection of $b$ onto the column space of $A$.
+
+
+---
+
+QR example:
+
+$$
+A = 
+\begin{bmatrix} 
+    1 & 1 \\
+    1 & 1.1 \\
+    1 & 0.9 
+\end{bmatrix}
+= 
+\begin{bmatrix} 
+    \,|\, & \,|\, \\
+    a_1 & a_2 \\
+    \,|\, & \,|\, 
+\end{bmatrix}
+$$
+
+$A$ is nearly singular. 
+
+---
+
+We apply the **Gram–Schmidt algorithm** to orthonormalize the columns of $A$:
+
+$$
+q_1 = \frac{a_1}{\|a_1\|}, 
+\qquad
+u_2 = a_2 - (q_1^\top a_2)\,q_1,
+\qquad 
+q_2 = \frac{u_2}{\|u_2\|}.
+$$
+
+---
+
+$$
+q_1 = \frac{a_1}{\|a_1\|} = \frac{1}{\sqrt{3}} \begin{bmatrix} 1 \\ 1 \\ 1\end{bmatrix} \\
+$$
+
+
+$$
+u_2 = a_2 - (q_1^\top a_2)\,q_1 = \begin{bmatrix} 1 \\ 1.1 \\ 0.9\end{bmatrix} - 1.732 \times \frac{1}{\sqrt{3}} \begin{bmatrix} 1 \\ 1 \\ 1\end{bmatrix} = \begin{bmatrix} 0 \\ 0.1 \\ -0.1\end{bmatrix} \\
+q_2 = \frac{u_2}{\|u_2\|} = \begin{bmatrix} 0 \\ 0.7071 \\ -0.7071\end{bmatrix}.
+$$
+
+---
+
+Then we can write
+$$
+Q = 
+\begin{bmatrix} 
+\,|\, & \,|\, \\
+q_1 & q_2 \\
+\,|\, & \,|\, 
+\end{bmatrix} =
+\begin{bmatrix} 
+\frac{1}{\sqrt{3}}, & 0, \\
+\frac{1}{\sqrt{3}} & 0.7071 \\
+\frac{1}{\sqrt{3}}, & -0.7071 
+\end{bmatrix}
+$$
+
+---
+
+Since $q_1, q_2$ are a basis for $A$, we can express $a_1, a_2$ as linear combinations of $q_1, q_2$. 
+
+$$
+a_j = (q_1^\top a_j)\,q_1 + (q_2^\top a_j)\,q_2 
+$$
+The coefficients of the linear combinations can be written as an upper triangular matrix, $R$:
+
+$$R = 
+\begin{bmatrix}
+q_1^\top a_1 & q_1^\top a_2 \\
+0 & q_2^\top a_2
+\end{bmatrix} = \begin{bmatrix}
+1.723 & 1.723 \\
+0 & 0.141
+\end{bmatrix} $$
+
+---
+
+So the **QR decomposition** is
+
+$$
+A =
+\begin{bmatrix}
+\,|\, & \,|\, \\
+a_1 & a_2 \\
+\,|\, & \,|\,
+\end{bmatrix}
+=
+\begin{bmatrix}
+\,|\, & \,|\, \\
+q_1 & q_2 \\
+\,|\, & \,|\,
+\end{bmatrix}
+\begin{bmatrix}
+q_1^\top a_1 & q_1^\top a_2 \\
+0 & q_2^\top a_2  \\
+\end{bmatrix} = QR
+$$
+
+- Here $Q$ has orthonormal columns ($q^\top q = 1$)
+- $R$ collecting the projection coefficients $q_i^\top a_j$, upper triangular
+
+---
+
+Geometrically $Q$ rotates the correlated columns of $A$ into perpendicular directions, $R$ rescales columns to preserving numerical stability.
+
+::: {.columns}
+
+::: {.column width="50%"}
+![](figures_for_linear_algebra/gs3d_grid_rot-crop.gif)
+:::
+::: {.column width="50%"}
+![](figures_for_linear_algebra/gs3d_columns_rot-crop2.gif)
+:::
+:::
+
+---
+
+## Application: Whitening/decorrelating
+
+```{r, echo = T, eval = F}
+X # Two column data frame, where X[,1] and X[,2] are correlated
+Q <- qr.Q(qr(X)) # QR decomposition
+ggplot(X, aes(X1 <- X[,1], X2 <- X[,2])) # Correlated data (left)
+ggplot(Q, aes(Q1 <- Q[,1], Q2 <- Q[,2])) # Orthogonalized version (right)
+```
+
+```{r}
+#| echo: false
+#| fig-height: 8
+#| fig-width: 16
+#| fig-align: center
+library(palmerpenguins)
+# Real correlated features: flipper_length_mm and body_mass_g
+df <- na.omit(penguins[, c("flipper_length_mm", "body_mass_g")])
+X <- scale(as.matrix(df))               # center + scale
+cor_before <- cor(X)[1, 2]              # correlation before QR
+
+# QR decomposition (orthogonalize columns)
+qrX <- qr(X)
+Q <- qr.Q(qrX)
+cor_after <- cor(Q)[1, 2]               # correlation after QR
+
+# Plot before vs after
+p1 <- ggplot(data.frame(X), aes(X1 <- X[,1], X2 <- X[,2])) +
+  geom_point(alpha=0.5, color="gray40", size = 2.1) +
+  labs(title=sprintf("Original palmerpenguins data (corr = %.1f)", cor_before),
+       x="Flipper length", y="Body mass") +
+  theme_classic(base_size = 24)
+
+p2 <- ggplot(data.frame(Q), aes(Q1 <- Q[,1], Q2 <- Q[,2])) +
+  geom_point(alpha=0.6, color="steelblue", size = 2.1) +
+  labs(title=sprintf("After QR orthogonalization (corr = %.1f)", cor_after),
+       x="Q[,1]", y="Q[,2]") +
+  theme_classic(base_size = 24)
+
+(p1 | p2)
+
+```
+
+:::{.notes}
+Let's look at an example with penguin flipper length and body mass data.
+“Flipper length and weight are strongly correlated → redundant information.”
+“QR orthogonalizes these axes, giving uncorrelated combinations — just like whitening.”
+“This helps in regression, PCA, and optimization, where independent directions simplify computation.”
+:::
+
+---
+
+### QR decorrelates the features
+
+```{r}
+#| echo: false
+#| fig-align: center
+library(ggplot2)
+library(reshape2)
+#| fig-height: 4
+#| fig-width: 12
+#| 
+X <- scale(na.omit(penguins[, c("flipper_length_mm","body_mass_g")]))
+M <- cor(X)
+
+df <- melt(M, varnames = c("Var1","Var2"), value.name = "r")
+
+p_before = ggplot(df, aes(Var2, Var1, fill = r)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(-1,1), midpoint = 0) +
+  coord_equal() +
+  labs(title = "Before", x = NULL, y = NULL, fill = "corr") +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.margin = margin(10, 15, 10, 15),
+    axis.text.x = element_text(angle = 0, vjust = 0.5),
+    axis.text.y = element_text(angle = 90, hjust = 0.5),
+    legend.position = "none"
+  )
+
+qrX <- qr(X); Q <- qr.Q(qrX)
+M2  <- cor(Q)
+rownames(M2) = c("flipper_length_mm","body_mass_g")
+colnames(M2) = c("flipper_length_mm","body_mass_g")
+
+df <- melt(M2, varnames = c("Body Mass, g","Flipper Length, mm"), value.name = "r")
+
+p_after  <- ggplot(df, aes(`Body Mass, g`, `Flipper Length, mm`, fill = r)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(-1,1), midpoint = 0) +
+  coord_equal() +
+  labs(title = "Before", x = NULL, y = NULL, fill = "corr") +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.margin = margin(10, 15, 10, 15),
+    axis.text.x = element_text(angle = 0, vjust = 0.5),
+    axis.text.y = element_text(angle = 90, hjust = 0.5)
+  ) + labs(title = "After (QR whitened)")
+patchwork::wrap_plots(p_before, p_after, nrow = 1) 
+
+```
+
+---
+
+| Method | Pros | Cons |
+|----------|-------------------------------|------------------------------| 
+| LU | Diagonalizes *square* matrices | Does not work if matrix is ill-conditioned | 
+| QR | Orthogonal projection can triangularize even ill-conditioned matrices | Does not diagonalize | 
+
+\
+
+**Can we diagonalize any matrix?**
+
+---
+
+## When can we make a matrix truly diagonal? {#Eigen}
+
+- We can write certain square matrices $A_{n\times n}$ in the form
+$$A = Q\Lambda Q^{-1}, \Lambda = diag\{\lambda_1, ..., \lambda_n\}$$
+- These square matrices are diagonalizable.
+
+- Eigenvalues $\lambda_1, ..., \lambda_n$ are obtained by solving for $\lambda$ s.t. $\forall x: Ax = \lambda x$.
+- For each $\lambda_i$, solve for eigenvector $x_i$ in $Ax_i = \lambda_i x_i$.
+
+---
+
+- $A_{n\times n}$ can have 0, 1, ..., n real eigenvalues.
+- If $A$ is symmetric, it has real eigenvalues.
+- If $\lambda_i$'s are distinct, then $x_i$'s are orthogonal. Then,
+
+$$Q = \begin{bmatrix} 
+\,|\, & \,|\, & & \,|\,\\
+x_1 & x_2 & \dots & x_n\\
+\,|\, & \,|\,  & & \,|\,
+\end{bmatrix}, \ \ Q^{-1} = Q^\top$$
+
+---
+
+- Diagonalization reveals the invariant directions $x_i$'s and their scaling $\lambda_i$'s.
+
+- Computing $A^k$ is fast with diagonalization: $A^k = Q \Lambda^k Q^{-1}$.
+
+::: {.columns}
+
+::: {.column width="50%"}
+![](figures_for_linear_algebra/rotate_grid.gif)
+:::
+::: {.column width="50%"}
+![](figures_for_linear_algebra/diagonal_grid.gif)
+:::
+:::
+
+---
+
+## Applications: Predator-prey model 
+
+Basic model:
+
+```{r, echo = F, results="hide"}
+library(deSolve)
+library(ggplot2)
+library(dplyr)
+library(gganimate)
+
+# Parameters
+params <- c(alpha = 1.0, beta = 0.8, gamma = 1.5, delta = 0.5)
+init   <- c(x = 1, y = 2)
+times  <- seq(0, 30, by = 0.05)
+
+# ODE function
+lotka_volterra <- function(t, state, parms) {
+  with(as.list(c(state, parms)), {
+    dx <- alpha * x - beta * x * y
+    dy <- delta * x * y - gamma * y
+    list(c(dx, dy))
+  })
+}
+
+# Simulate
+out1 <- as.data.frame(ode(y = init, times = times, func = lotka_volterra, parms = params))
+
+# Equilibrium and Jacobian
+x_star <- params["gamma"] / params["delta"]
+y_star <- params["alpha"] / params["beta"]
+J <- matrix(c(params["alpha"] - params["beta"] * y_star,
+              -params["beta"] * x_star,
+               params["delta"] * y_star,
+               params["delta"] * x_star - params["gamma"]), 2, 2, byrow = TRUE)
+eig <- eigen(J)
+
+cat("Eigenvalues:\n"); print(eig$values)
+cat("Eigenvectors:\n"); print(eig$vectors)
+
+# Time-series plot
+p_time = ggplot(out1, aes(time)) +
+  geom_line(aes(y = x, color = "Prey"), linewidth = 1.2) +
+  geom_line(aes(y = y, color = "Predator"), linewidth = 1.2) +
+  scale_color_manual(values = c("#2ECCFA", "#FFB347")) +
+  labs(title = "Predator–prey oscillations",
+       subtitle = expression("Populations follow Lotka–Volterra cycles"),
+       x = "Time", y = "Population", color = NULL) +
+  theme_classic(base_size = 14)
+```
+
+```{r, echo = F}
+#| fig-align: center
+p_time
+```
+
+---
+
+Set $\alpha=1.0, \beta=0.8,  \gamma=1.5, \delta=0.5$.
+
+Earlier, we found the **equilibrium**:
+$$
+x^* = \frac{\gamma}{\delta} = 3\qquad y^*= \frac{\alpha}{\beta} = 1.25
+$$
+
+\
+
+How does the system behave around the equilibrium? 
+
+---
+
+We can answer this by inspecting the eigenvalues of the Jacobian.
+
+$$
+J(x^∗,y^∗)=VΛV^{−1},
+$$
+
+```{r, echo = F}
+cat("Jacobian:\n"); print(J)
+cat("Eigenvalues:\n"); print(eig$values)
+cat("Eigenvectors:\n"); print(eig$vectors)
+```
+
+---
+
+System oscillates around equilibrium without ever reaching it.
+
+![](figures_for_linear_algebra/predator_prey_eig.gif){fig-align="center"}
+
+---
+
+Add prey carrying capacity and max predation rate:
+
+
+$$
+\frac{dx}{dt}=\alpha x\!\left(1-\frac{x}{K}\right) - \beta\,\frac{x y}{1+a x}, \qquad
+\frac{dy}{dt}=\delta\,\frac{x y}{1+a x} - \gamma y.
+$$
+
+```{r, echo = F, results="hide"}
+library(deSolve)
+library(ggplot2)
+library(dplyr)
+library(gganimate)
+
+# --- Parameters (now includes K and a) ---
+params <- c(alpha = 1.0, beta = 0.8, gamma = 1.5, delta = 0.5,
+            K = 1000.0, a = 0.01)
+
+init   <- c(x = 1, y = 2)
+times  <- seq(0, 30, by = 0.05)
+
+# --- General predator–prey ODE (logistic prey + Holling II response) ---
+lotka_volterra_general <- function(t, state, parms) {
+  with(as.list(c(state, parms)), {
+    denom <- 1 + a * x
+    dx <- alpha * x * (1 - x / K) - beta * x * y / denom
+    dy <- delta * x * y / denom - gamma * y
+    list(c(dx, dy))
+  })
+}
+
+# --- Simulate ---
+out <- as.data.frame(ode(y = init, times = times,
+                         func = lotka_volterra_general, parms = params))
+
+# --- Equilibria ---
+# Always: (0,0) and (K,0)
+eq_list <- list(c(0, 0), c(params["K"], 0))
+
+# Potential interior equilibrium (if feasible)
+delta <- params["delta"]; gamma <- params["gamma"]; a <- params["a"]
+alpha <- params["alpha"]; beta <- params["beta"]; K <- params["K"]
+
+if (delta - gamma * a > 0) {
+  x_star_int <- gamma / (delta - gamma * a)
+  y_star_int <- (1 + a * x_star_int) * alpha * (1 - x_star_int / K) / beta
+  if (x_star_int > 0 && x_star_int < K && y_star_int > 0) {
+    eq_list <- append(eq_list, list(c(x_star_int, y_star_int)))
+  }
+}
+
+# Pack equilibria into a data frame
+eq_df <- do.call(rbind, eq_list) %>%
+  as.data.frame() %>%
+  setNames(c("x", "y")) %>%
+  mutate(label = paste0("Eq ", row_number()))
+
+# --- Jacobian at a chosen equilibrium (use (K,0) by default) ---
+eq_choice <- c(K, 0)  # change to eq_df[3,1:2] if interior exists
+x0 <- eq_choice[1]; y0 <- eq_choice[2]
+den0 <- 1 + a * x0
+
+# Partial derivatives for the general model
+f1x <- alpha * (1 - 2 * x0 / K) - beta * y0 / den0 + beta * x0 * y0 * a / (den0^2)
+f1y <- - beta * x0 / den0
+f2x <-  delta * y0 / den0 - delta * x0 * y0 * a / (den0^2)
+f2y <-  delta * x0 / den0 - gamma
+
+J <- matrix(c(f1x, f1y, f2x, f2y), nrow = 2, byrow = TRUE)
+eig <- eigen(J)
+
+cat("Equilibria:\n"); print(eq_df)
+cat("\nJacobian at chosen equilibrium (K,0):\n"); print(J)
+cat("\nEigenvalues:\n"); print(eig$values)
+cat("Eigenvectors:\n"); print(eig$vectors)
+
+# --- Time-series plot ---
+p_time_c <- ggplot(out, aes(time)) +
+  geom_line(aes(y = x, color = "Prey"), linewidth = 1.2) +
+  geom_line(aes(y = y, color = "Predator"), linewidth = 1.2) +
+  scale_color_manual(values = c("#2ECCFA", "#FFB347")) +
+  labs(title = "Predator–prey dynamics (logistic + Holling II)",
+       subtitle = expression(paste("Parameters: ",
+                                   alpha,"=1, ", beta,"=0.8, ",
+                                   gamma,"=1.5, ", delta,"=0.5, ",
+                                   K,"=1000, ", a,"=0.1")),
+       x = "Time", y = "Population", color = NULL) +
+  theme_classic(base_size = 14)
+
+# Print plot (optional, if your knitting shows graphics)
+# print(p_time)
+```
+
+```{r, echo = F}
+#| fig-align: center
+p_time_c + labs(title = "")
+```
+
+---
+
+Set $\alpha=1.0, \beta=0.8,  \gamma=1.5, \delta=0.5, K=1000, a=0.1$.
+
+Earlier, we found the **equilibrium**:
+$$
+x^* = 4.29 \qquad y^*= 1.78
+$$
+
+```{r, echo = F}
+# --- Simulate ---
+out <- as.data.frame(ode(y = init, times = times,
+                         func = lotka_volterra_general, parms = params))
+
+# --- Equilibria ---
+# Always: (0,0) and (K,0)
+eq_list <- list(c(0, 0), c(params["K"], 0))
+
+# Potential interior equilibrium (if feasible)
+delta <- params[["delta"]]; gamma <- params[["gamma"]]; a <- params[["a"]]
+alpha <- params[["alpha"]]; beta <- params[["beta"]]; K <- params[["K"]]
+
+if (delta - gamma * a > 0) {
+  x_star_int <- gamma / (delta - gamma * a)
+  y_star_int <- (1 + a * x_star_int) * alpha * (1 - x_star_int / K) / beta
+  if (x_star_int > 0 && x_star_int < K && y_star_int > 0) {
+    eq_list <- append(eq_list, list(c(x_star_int, y_star_int)))
+  }
+}
+
+# Pack equilibria into a data frame
+eq_df <- do.call(rbind, eq_list) %>%
+  as.data.frame() %>%
+  setNames(c("x", "y")) %>%
+  mutate(label = paste0("Eq ", row_number()))
+
+# --- Jacobian at a chosen equilibrium (use (K,0) by default) ---
+eq_choice <- c(4.29, 1.78)  # change to eq_df[3,1:2] if interior exists
+x0 <- eq_choice[1]; y0 <- eq_choice[2]
+den0 <- 1 + a * x0
+
+# Partial derivatives for the general model
+f1x <- alpha * (1 - 2 * x0 / K) - beta * y0 / den0 + beta * x0 * y0 * a / (den0^2)
+f1y <- - beta * x0 / den0
+f2x <-  delta * y0 / den0 - delta * x0 * y0 * a / (den0^2)
+f2y <-  delta * x0 / den0 - gamma
+
+J <- matrix(c(f1x, f1y, f2x, f2y), nrow = 2, byrow = TRUE)
+eig <- eigen(J)
+
+#cat("Equilibria:\n"); print(eq_df)
+cat("\nJacobian at chosen equilibrium (K,0):\n"); print(J)
+cat("\nEigenvalues:\n"); print(eig$values)
+cat("Eigenvectors:\n"); print(eig$vectors)
+
+```
+
+```{r, echo = F, eval = F}
+#| fig-align: center
+# Assume you already have `out` from integrating the general model:
+# out has columns: time, x, y
+
+library(ggplot2)
+params <- list(alpha=1.0, beta=0.8, gamma=1.5, delta=0.5, K=1000, a=0.1)
+
+# Coexistence equilibrium (if it exists)
+delta <- params$delta; gamma <- params$gamma; a <- params$a
+alpha <- params$alpha; beta <- params$beta; K <- params$K
+
+eq_pts <- data.frame(x=numeric(), y=numeric(), label=character())
+
+# Boundary equilibria always exist:
+eq_pts <- rbind(eq_pts, data.frame(x=0, y=0, label="(0,0)"),
+                         data.frame(x=K, y=0, label="(K,0)"))
+
+# Interior equilibrium if feasible:
+if (delta - gamma*a > 0) {
+  x_star <- gamma / (delta - gamma*a)
+  y_star <- (1 + a*x_star) * alpha * (1 - x_star / K) / beta
+  if (x_star > 0 && x_star < K && y_star > 0) {
+    eq_pts <- rbind(eq_pts, data.frame(x=x_star, y=y_star, label="coexistence"))
+  }
+}
+
+# Helpful axis limits
+xmax <- max(max(out$x), K, na.rm=TRUE)
+ymax <- max(max(out$y), 1, na.rm=TRUE)
+
+# Prey nullcline function y(x)
+y_null <- function(x) (1 + a*x) * alpha * (1 - x/K) / beta
+
+# Predator vertical nullcline (if it exists)
+x_thresh <- if (delta - gamma*a > 0) gamma / (delta - gamma*a) else NA_real_
+
+# Phase portrait with trajectory, equilibrium, and nullclines
+p_phase <- ggplot(out, aes(x=x, y=y)) +
+  geom_path(linewidth=1, color = "grey50") +
+  geom_point(data=filter(eq_pts, label == "coexistence"), aes(x=x, y=y, color=label), size=3) +
+  # prey nullcline
+  stat_function(fun = y_null,
+                xlim = c(0, 15),
+                linetype = "dashed", color = "#FFB347") +
+  # predator nullclines
+  geom_hline(yintercept = 0, linetype = "dotted", color = "#2ECCFA") +
+  { if (!is.na(x_thresh)) geom_vline(xintercept = x_thresh, linetype = "dotted", color = "#2ECCFA") } +
+  labs(title = "Predator–prey phase portrait",
+       subtitle = "Trajectory with equilibrium and nullclines",
+       x = "Prey (x)", y = "Predator (y)", shape = NULL,
+       caption = "X-nullcline where prey population is not changing (orange) \n Y-nullcline where predator population is not changing (blue)") +
+  theme_classic(base_size = 14)
+
+print(p_phase)
+
+# "#2ECCFA", "#FFB347"
+```
+
+---
+
+```{r, eval = F, echo = F}
+x_star = 0; y_star = 0
+# Phase-space (x vs y)
+p_phase <- ggplot(out, aes(x, y, frame = time)) +
+  geom_path(color = "gray60") +
+  geom_point(aes(color = time), size = 1.8) +
+  geom_point(aes(x = x_star, y = y_star), color = "red", size = 3) +
+  labs(title = "Phase portrait: predator–prey cycles",
+       subtitle = "Eigen decomposition explains the local rotation near equilibrium",
+       x = "Prey population", y = "Predator population") +
+  scale_color_viridis_c(option = "plasma") +
+  theme_classic(base_size = 24)
+
+# Optional animation (requires gganimate)
+anim <- p_phase + transition_reveal(time)
+animate(anim, nframes = 150, fps = 25, width = 800, height = 600)
+
+anim_save("predator_prey_eig.gif", animation = last_animation())
+
+```
+
+![](figures_for_linear_algebra/predator_prey_eig_unstable.gif){fig-align="center"}
+
+---
+
+In both examples, eigenvalues of $J$ are complex in the form $a \pm ib$ . $b$ is the rotation speed and $a$ is the growth/decay rate. If $a \gt 0$ like in our second example, the system is unstable and never reaches equilibrium.
+
+---
+
+## Not every matrix is lucky :(
+
+Symmetric square matrices are always diagonalizable. But this is not true if the matrix is either not symmetric or not square.
+
+Can we find orthogonal directions that best capture $A$’s stretching for any matrix?
+
+---
+
+## 3. Singular Value Decomposition {#SVD}
+
+- Any matrix $A_{m\times n}$ can be diagonalized using SVD:
+
+$$A = U \Sigma V^\top, \qquad \Sigma = diag(\sigma_1, ..., \sigma_r), \qquad \sigma_i \ge 0$$
+
+- $V$: eigenvectors of $A^\top A$
+- $U$: eigenvectors of $A A^\top$
+- $\sigma_i^2$: corresponding eigenvalues (the "energy" per direction)
+
+$$A^\top A v_i = \sigma_i^2 v_i, \qquad AA^\top u_i = \sigma_i^2 u_i$$
+
+---
+
+Geometrically, for an input $x$ and linear transformation $A_{m \times n}: \mathbb{R}^n \rightarrow \mathbb{R}^m$:
+
+- $V^\top$ rotates/re-expresses the $x$ onto the orthonormal basis of the input space of $A$ in $\mathbb{R}^n$.
+- $\Sigma$ stretches $V^\top x$ along the new directions ($\sigma_1 \ge \sigma_2 \ge ...$) 
+- $U$ rotates $\Sigma V^\top x$ onto the output space of $A$ in $\mathbb{R}^m$.
+
+---
+
+![](figures_for_linear_algebra/svd_axes_labels.gif){fig-align="center"}
+
+---
+
+## Application: PCA
+
+- PCA simplifies complex data $X$ by changing the coordinate system to (orthogonal) principal components (PCs, $v_k$).
+
+- Each PC is a linear combination of the original variables that captures maximal remaining variance.
+
+- PC scores are the coefficients for the linear combinations.
+
+- We hope that a few PCs capture most of the variance in $X$.
+
+---
+
+### Steps:
+
+1. For the centered data matrix $X$, perform the SVD:
+
+$$
+X = U \Sigma V^\top,
+$$
+
+---
+
+2. Define
+
+- **Principal componenets (eigenvectors):** $V = [v_1, \dots, v_p]$  
+- **Scores:**  $Z = X V = U \Sigma$
+- **Variance explained by component $i$:** proportional to $\sigma_i^2$
+
+Thus, the SVD directly provides the PCA decomposition:
+$$
+X = Z V^\top = U \Sigma V^\top.
+$$
+
+---
+
+**Note:**  
+PCA can equivalently be obtained by the eigendecomposition of the covariance matrix
+$$
+S = \tfrac{1}{n-1} X^\top X = V \left(\tfrac{\Sigma^2}{n-1}\right) V^\top,
+$$
+which differs from the SVD formulation only by the scaling factor $1/(n-1)$.
+
+---
+
+**Example:** Penguin data
+
+- Covariates: species, bill length, bill depth, flipper length
+- PCA decorrelates the x and y axes
+
+```{r, echo=F}
+#| fig-align: center
+# Prepare data
+peng <- na.omit(penguins[, c("species", 
+                             "bill_length_mm", 
+                             "bill_depth_mm", 
+                             "flipper_length_mm")])
+
+# Pairwise relationships (classic morphology scatter)
+p_raw <- ggplot(peng, aes(x = flipper_length_mm, y = bill_depth_mm, color = species)) +
+  geom_point(size = 2, alpha = 0.8) +
+  theme_classic(base_size = 14) +
+  labs(title = "Before PCA",
+       x = "Bill length (mm)",
+       y = "Flipper length (mm)",
+       color = "Species")
+
+
+# PCA on scaled numeric features
+X <- scale(peng[, -1])
+pca <- prcomp(X)
+
+# Add scores to data frame
+peng$PC1 <- pca$x[,1]
+peng$PC2 <- pca$x[,2]
+
+# Scatterplot of first two PCs
+p_pca  = ggplot(peng, aes(x = PC1, y = PC2, color = species)) +
+  geom_point(size = 2, alpha = 0.8) +
+  theme_classic(base_size = 14) +
+  labs(title = "PCA Results",
+       x = "PC1",
+       y = "PC2",
+       color = "Species")
+p_raw + p_pca
+```
+
+---
+
+```{r, echo=F}
+#| fig-align: center
+biplot(pca, scale=0, main="Penguins — PCA biplot", cex = c(0.3, 1))
+```
+
+- PC1 captures overall size (bill + flipper length).
+
+- PC2 captures shape (bill depth vs. length).
+
+- The 3 species cluster along these orthogonal axes.
+
+:::{.notes}
+Before PCA: measurements (bill length, flipper length) are highly correlated — points lie along a diagonal “size” axis.
+
+After PCA: PCA rotates and rescales the space to form orthogonal axes of maximum variance.
+:::
+
+
+---
+
+# Conclusion
+
+---
+
+<div style="display:flex;justify-content:center;align-items:center;height:80vh;text-align:center;">
+  <p style="font-size:1em;"><strong><em>LU gives fast solutions, but not stable ones; QR gives stability; SVD gives structure and universality.</em></strong></p>
+</div>
+
+---
+
+# Thank you!
+
+---
+
+
+# Appendix {#Appendix}
+
+---
+
+- **Singular vs. nonsingular**: pivots in elimination, rank $= n$, later: $\det A \neq 0$.
+- Appendix A: Fundamental Theorem of Linear Algebra
+- Appendix B: WLS and FFT Examples for QR and Gram-Schmidt
+- Appendix C: Determinants
+
+\
+
+[Back to top](#First)
+
+---
+
+# Appendix A
+
+## Fundamental Theorem of Linear Algebra
+
+For $A\in\mathbb{R}^{m\times n}$, there are 4 fundamental subspaces:
+
+- Column space $C(A)$ $\subseteq \mathbb{R}^m$ 
+
+- Nullspace $N(A)\subseteq \mathbb{R}^n$;  
+
+- Row space $C(A^\top)\subseteq \mathbb{R}^n$ 
+
+- Left nullspace $N(A^\top)\subseteq \mathbb{R}^m$;  
+
+---
+
+## Fundamental Theorem of Linear Algebra
+
+Orthogonality: 
+
+- $C(A)^\perp= N(A^\top)$
+
+- $C(A^\top)^\perp= N(A)$;  
+
+Dimensions: 
+
+- $\dim C(A)=\dim C(A^\top)=\mathrm{rank}(A)=r$
+
+- $\dim N(A)=n-r$, $\dim N(A^\top)=m-r$.
+
+---
+
+**Small example**
+
+```{r}
+A <- matrix(c(1,2, 2,4, 0,1), nrow=3, byrow=TRUE)  # rank 2?
+qrA <- qr(A); r <- qrA$rank
+r; ncol(A); nrow(A)
+# basis for column space from QR:
+Q <- qr.Q(qrA); R <- qr.R(qrA)
+basis_col <- Q[,1:r,drop=FALSE]; basis_col
+```
+
+---
+
+**Why useful?** It describes *existence* and *structure* of solutions:
+- $Ax=b$ solvable iff $b\in{C}(A)$.
+- Solutions are $x=x_p + x_n$ with $x_n\in{N}(A)$ (non‑uniqueness lives in the nullspace).
+- Invertibility $\Leftrightarrow r=n$ $\Rightarrow$ unique solution.
+
+## Orthogonality (vectors, subspaces)
+
+### Projection onto a line; cosine & least squares
+
+For nonzero $a$, the projection of $y$ onto $\mathrm{span}\{a\}$:
+$$
+\hat y = \frac{a^\top y}{a^\top a}\; a, \qquad \cos\theta=\frac{a^\top y}{\|a\|\,\|y\|}.
+$$
+
+```{r}
+a <- c(2,1); y <- c(1,2)
+yhat <- (sum(a*y)/sum(a*a))*a
+cbind(a,y,yhat)
+```
+
+The least‑squares problem $ min_x ||Ax-b||_2$ is an orthogonal projection of $b$ onto ${C}(A)$.
+
+---
+
+# Appendix B
+
+## Applications of Gram–Schmidt and QR
+
+- **WLS (weighted least squares):** Minimize $\|W^{1/2}(Ax-b)\|_2$. Normal equations: $(A^\top W A)\hat x=A^\top W b$ (SPD). Use **Cholesky** on $A^\top W A$.
+
+```{r}
+A <- cbind(1, c(0,1,2,3)); b <- c(1,2,2,3)
+w <- c(1,4,1,2); W <- diag(w)
+x_hat <- solve(t(A)%*%W%*%A, t(A)%*%W%*%b)
+x_hat
+```
+
+---
+
+- If you need a refresher on the Fourier transform, [this video](https://www.youtube.com/watch?v=spUNpyF58BY) is my favourite.
+- **FFT (orthogonality over $\mathbb{C}$)**: columns of the DFT matrix are orthogonal.
+
+```{r}
+k <- 0:3; n <- 4
+omega <- exp(-2*pi*1i/n)
+F4 <- outer(k,k,function(r,c) omega^(r*c))
+H <- Conj(t(F4)) %*% F4
+round(H)   # equals 4 I_4 (up to tiny imaginary parts)
+```
+
+# Appendix C
+
+## Determinants
+
+### Definition & three key properties
+
+1. **Multilinear & alternating** in rows (or columns).  
+2. Effect of elementary ops: swap → sign change; scaling a row by $c$ → factor $c$; adding multiple of a row → unchanged.  
+3. **Multiplicativity**: $\det(AB)=\det(A)\det(B)$.
+
+Consequences:
+- $\det(A)\neq 0 \iff A$ invertible; $\det(L)$ and $\det(U)$ are products of diagonals.  
+- Product of **pivots** (up to sign) = $\det(A)$.  
+- Volume scaling: $|\det A|$ = factor by which $A$ scales $n$-volume.
+
+---
+
+### Deriving the formula (permutations & cofactors)
+
+$$
+\det(A)=\sum_{\sigma\in S_n}\mathrm{sgn}(\sigma)\prod_{i=1}^n a_{i,\sigma(i)}.
+$$
+
+Cofactor expansion along row $i$:
+$$
+\det(A)=\sum_{j=1}^n a_{ij} C_{ij},\qquad C_{ij}=(-1)^{i+j}\det(A_{ij}).
+$$
+
+---
+
+**Example (3×3)**
+
+```{r}
+A <- matrix(c(2,-1,0, 1,3,4, 0,5,2),3,byrow=TRUE)
+det(A)  # built-in for sanity
+```
+
+**Applications (small systems)**  
+- $A^{-1}=\dfrac{1}{\det A}\, \mathrm{adj}(A)$ (conceptual, not for computing large inverses).  
+- **Cramer’s Rule** (good for 2×2 demo).
+
+```{r}
+A <- matrix(c(3,2, 1,4),2)
+b <- c(7,5)
+x1 <- det(cbind(b, A[,2]))/det(A)
+x2 <- det(cbind(A[,1], b))/det(A)
+c(x1,x2)
+```
+

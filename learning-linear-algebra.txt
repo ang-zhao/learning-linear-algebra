@@ -1,0 +1,381 @@
+---
+title: "Linear Algebra in One Hour (Strang, Ch. 1–5)"
+subtitle: "Matrices → Subspaces → Orthogonality → Determinants → Eigen‑stuff"
+author: "Your Name (Department / University)"
+date: "`r format(Sys.Date())`"
+format:
+  revealjs:
+    theme: [dark]
+    slide-number: true
+    transition: fade
+    incremental: true
+    code-overflow: wrap
+    code-copy: true
+    chalkboard: true
+    toc: false
+    progress: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## Goals
+
+- A fast, example‑first pass through Strang Chs. 1–5.
+- Move comfortably between **algebra**, **geometry**, and **computation**.
+- Know what to compute (and what not to), what it **costs**, and where numerical traps are.
+
+::: {.notes}
+Pace: ~12 min for §1, 12 for §2, 12 for §3, 10 for §4, 12 for §5. Skip marked “(optional)” if short on time.
+:::
+
+## 1. What is a matrix?
+
+- Data structure *and* linear map: \(A \in \mathbb{R}^{m\times n}\) acts by \(x \mapsto Ax\).
+- Core goal: **solve** \(Ax=b\), not literally compute \(A^{-1}\).
+- Geometry of \(Ax=b\) in \(\mathbb{R}^2\): 0, 1, or infinitely many intersections.
+
+### Three geometric cases (lines in \(\mathbb{R}^2\))
+
+```{r}
+#| echo: false
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(grid))
+p <- ggplot(data.frame(x=c(-2,2)), aes(x=x)) +
+  coord_fixed(xlim=c(-2,2), ylim=c(-2,2)) + theme_minimal(base_size=16) +
+  theme(panel.background=element_rect(fill="#0b0f10", colour=NA),
+        plot.background=element_rect(fill="#0b0f10", colour=NA),
+        text=element_text(colour="white"), axis.text=element_text(colour="white"))
+# unique solution
+p1 <- p + geom_abline(intercept=0.5, slope=1) + geom_abline(intercept=-0.5, slope=-0.5) +
+  ggtitle("Unique solution (1 intersection)")
+# no solution
+p2 <- p + geom_abline(intercept=0.8, slope=1) + geom_abline(intercept=0.2, slope=1) +
+  ggtitle("No solution (parallel lines)")
+# infinitely many
+p3 <- p + geom_abline(intercept=-0.2, slope=0.7, linewidth=1.2) +
+  geom_abline(intercept=-0.2, slope=0.7, linewidth=0.4, linetype="dashed") +
+  ggtitle("Infinitely many solutions (same line)")
+p1; p2; p3
+```
+
+::: {.notes}
+Stress: “Solve \(Ax=b\)” ≠ “compute \(A^{-1}\)”. In practice use elimination/factorizations.
+:::
+
+### Linear transformations
+
+- Columns of \(A\) are images of the standard basis: \(A[e_1 \ \cdots \ e_n] = [a_1 \ \cdots \ a_n]\).
+- Examples: rotations, scalings, permutations.
+
+**A permutation matrix example**
+
+```{r}
+A <- matrix(1:16, nrow=4, byrow=TRUE)   # 4x4 so row/col swaps both make sense
+P <- diag(4)[c(2,1,3,4), ]               # swap rows 1 and 2
+P %*% A                                  # row swap
+A %*% t(P)                               # column swap
+```
+
+### Elementary row operations as matrices
+
+- Add multiple of row \(i\) to row \(j\): \(E_{ji}(\alpha)=I+\alpha e_j e_i^\top\).
+- Row swap \(i \leftrightarrow j\): permutation \(P_{ij}\).
+- Row scaling: \(D=\mathrm{diag}(d_1,\ldots,d_m)\).
+
+**Watch the matrix change**
+
+```{r}
+A <- matrix(c(2,1,1, 4,3,3, 8,7,9), 3, byrow=TRUE)
+E21 <- diag(3); E21[2,1] <- -2
+E31 <- diag(3); E31[3,1] <- -4
+U1 <- E31 %*% E21 %*% A
+E32 <- diag(3); E32[3,2] <- -3
+U  <- E32 %*% U1
+L  <- solve(E21) %*% solve(E31) %*% solve(E32) # product of inverses
+list(L=L, U=U, check=L %*% U)
+```
+
+### From elimination to triangular systems → LDU
+
+- With no pivoting issues, elimination yields \(A=LU\).
+- Normalize \(U\) to unit diagonal: \(U=\underbrace{D}_{\text{diag}(u_{11},\dots)}\underbrace{U'}_{\text{unit upper}}\) → \(A=LDU'\).
+- Triangular systems are easy: back/forward substitution.
+
+```{r}
+lu_to_ldu <- function(L,U){
+  D <- diag(diag(U))
+  Up <- solve(D) %*% U
+  list(L=L, D=D, Up=Up, A=L %*% D %*% Up)
+}
+lu_to_ldu(L,U)
+```
+
+### Inverse & transpose (definitions + quick example)
+
+- \(A^{-1}\) satisfies \(A^{-1}A=I=AA^{-1}\) (if it exists).
+- \(A^\top\) flips rows/columns; \((AB)^\top=B^\top A^\top\).
+
+```{r}
+A <- matrix(c(3,1,1,2),2)
+A_inv <- solve(A)
+A_t   <- t(A)
+A_inv %*% A
+A_t
+```
+
+### A discrete derivative as a matrix
+
+Let \(f(t)\) sampled at \(t_1,\dots,t_n\) on a grid with step \(h\).  
+Central differences: \((Df)_i \approx (f_{i+1}-f_{i-1})/(2h)\).
+
+```{r}
+n <- 8; h <- 0.1
+D <- matrix(0, n, n)
+for(i in 2:(n-1)){ D[i,i+1] <-  1/(2*h); D[i,i-1] <- -1/(2*h) }
+# periodic ends (optional)
+D[1,2] <-  1/(2*h); D[1,n] <- -1/(2*h)
+D[n,1] <-  1/(2*h); D[n,n-1] <- -1/(2*h)
+f <- sin((1:n)*h)
+cbind(Df = round(D %*% f, 3))
+```
+
+### Computational runtime (flops; rule‑of‑thumb)
+
+- Mat‑vec \(Ax\): \(\mathcal{O}(mn)\).
+- Mat‑mat \(AB\): \(\mathcal{O}(mnk)\) for \(A\in\mathbb{R}^{m\times n},B\in\mathbb{R}^{n\times k}\).
+- Gaussian elimination (dense \(n\times n\)): \(\approx \tfrac{2}{3}n^3\) flops.  
+- Back/forward substitution: \(\approx n^2\) flops.
+
+::: {.notes}
+Emphasize scaling: 10× in \(n\) → ~1000× time for cubic tasks.
+:::
+
+### Numerical pitfalls
+
+- **Small pivots** can wreck naive elimination even when \(\det(A)\) is far from 0.
+- Example (partial pivoting saves you):
+\[
+A=\begin{bmatrix}10^{-4} & 1\\ 1 & 1\end{bmatrix}.
+\]
+Naive first pivot \(10^{-4}\Rightarrow\) huge multiplier \(10^4\) → catastrophic cancellation; swap rows first.
+
+```{r}
+A <- matrix(c(1e-4,1, 1,1),2,byrow=TRUE)
+# naive multiplier without pivoting:
+m <- A[2,1]/A[1,1]
+m
+# with partial pivoting, swap rows first:
+P <- diag(2)[c(2,1),]
+P %*% A
+```
+
+- **Singular vs. nonsingular**: pivots in elimination, rank \(= n\), later: \(\det A \neq 0\).
+
+## 2. Vector spaces & the four fundamental subspaces
+
+> **Fundamental Theorem of Linear Algebra (Strang):** For \(A\in\mathbb{R}^{m\times n}\),  
+> - Column space \(\mathcal{C}(A)\) \(\subseteq \mathbb{R}^m\) and nullspace \(\mathcal{N}(A)\subseteq \mathbb{R}^n\);  
+> - Row space \(\mathcal{C}(A^\top)\subseteq \mathbb{R}^n\) and left nullspace \(\mathcal{N}(A^\top)\subseteq \mathbb{R}^m\);  
+> - Orthogonality: \(\mathcal{C}(A)^\perp=\mathcal{N}(A^\top)\), \(\mathcal{C}(A^\top)^\perp=\mathcal{N}(A)\);  
+> - Dimensions: \(\dim\mathcal{C}(A)=\dim\mathcal{C}(A^\top)=\mathrm{rank}(A)=r\),  
+>   and \(\dim\mathcal{N}(A)=n-r\), \(\dim\mathcal{N}(A^\top)=m-r\).
+
+**Small example**
+
+```{r}
+A <- matrix(c(1,2, 2,4, 0,1), nrow=3, byrow=TRUE)  # rank 2?
+qrA <- qr(A); r <- qrA$rank
+r; ncol(A); nrow(A)
+# basis for column space from QR:
+Q <- qr.Q(qrA); R <- qr.R(qrA)
+basis_col <- Q[,1:r,drop=FALSE]; basis_col
+```
+
+**Why useful?** It describes *existence* and *structure* of solutions:
+- \(Ax=b\) solvable iff \(b\in\mathcal{C}(A)\).
+- Solutions are \(x=x_p + x_n\) with \(x_n\in\mathcal{N}(A)\) (non‑uniqueness lives in the nullspace).
+- Invertibility \(\Leftrightarrow r=n\) \(\Rightarrow\) unique solution.
+
+## 3. Orthogonality (vectors, subspaces), projections, Gram–Schmidt
+
+### Projection onto a line; cosine & least squares
+
+For nonzero \(a\), the projection of \(y\) onto \(\mathrm{span}\{a\}\):
+\[
+\hat y = \frac{a^\top y}{a^\top a}\; a, \qquad \cos\theta=\frac{a^\top y}{\|a\|\,\|y\|}.
+\]
+
+```{r}
+a <- c(2,1); y <- c(1,2)
+yhat <- (sum(a*y)/sum(a*a))*a
+cbind(a,y,yhat)
+```
+
+The least‑squares problem \( \min_x \|Ax-b\|_2\) is an orthogonal projection of \(b\) onto \(\mathcal{C}(A)\).
+
+### Gram–Schmidt (numerical) and QR
+
+```{r}
+set.seed(1)
+A <- matrix(rnorm(12), nrow=4)
+qrA <- qr(A)
+Q <- qr.Q(qrA); R <- qr.R(qrA)
+list(Q=round(Q,3), R=round(R,3), check=round(Q %*% R - A,8))
+```
+
+- **WLS (weighted least squares):** Minimize \(\|W^{1/2}(Ax-b)\|_2\). Normal equations: \((A^\top W A)\hat x=A^\top W b\) (SPD). Use **Cholesky** on \(A^\top W A\).
+
+```{r}
+A <- cbind(1, c(0,1,2,3)); b <- c(1,2,2,3)
+w <- c(1,4,1,2); W <- diag(w)
+x_hat <- solve(t(A)%*%W%*%A, t(A)%*%W%*%b)
+x_hat
+```
+
+- **FFT (orthogonality over \(\mathbb{C}\))**: columns of the DFT matrix are orthogonal.
+
+```{r}
+k <- 0:3; n <- 4
+omega <- exp(-2*pi*1i/n)
+F4 <- outer(k,k,function(r,c) omega^(r*c))
+H <- Conj(t(F4)) %*% F4
+round(H)   # equals 4 I_4 (up to tiny imaginary parts)
+```
+
+## 4. Determinants
+
+### Definition & three key properties
+
+1. **Multilinear & alternating** in rows (or columns).  
+2. Effect of elementary ops: swap → sign change; scaling a row by \(c\) → factor \(c\); adding multiple of a row → unchanged.  
+3. **Multiplicativity**: \(\det(AB)=\det(A)\det(B)\).
+
+Consequences:
+- \(\det(A)\neq 0 \iff A\) invertible; \(\det(L)\) and \(\det(U)\) are products of diagonals.  
+- Product of **pivots** (up to sign) = \(\det(A)\).  
+- Volume scaling: \(|\det A|\) = factor by which \(A\) scales \(n\)-volume.
+
+### Deriving the formula (permutations & cofactors)
+
+\[
+\det(A)=\sum_{\sigma\in S_n}\mathrm{sgn}(\sigma)\prod_{i=1}^n a_{i,\sigma(i)}.
+\]
+
+Cofactor expansion along row \(i\):
+\[
+\det(A)=\sum_{j=1}^n a_{ij} C_{ij},\qquad C_{ij}=(-1)^{i+j}\det(A_{ij}).
+\]
+
+**Example (3×3)**
+
+```{r}
+A <- matrix(c(2,-1,0, 1,3,4, 0,5,2),3,byrow=TRUE)
+det(A)  # built-in for sanity
+```
+
+**Applications (small systems)**  
+- \(A^{-1}=\dfrac{1}{\det A}\, \mathrm{adj}(A)\) (conceptual, not for computing large inverses).  
+- **Cramer’s Rule** (good for 2×2 demo).
+
+```{r}
+A <- matrix(c(3,2, 1,4),2)
+b <- c(7,5)
+x1 <- det(cbind(b, A[,2]))/det(A)
+x2 <- det(cbind(A[,1], b))/det(A)
+c(x1,x2)
+```
+
+## 5. Eigenvalues & eigenvectors
+
+Shift focus from \(Ax=b\) to \(Ax=\lambda x\).
+
+- Diagonalizable \(A=V\Lambda V^{-1}\Rightarrow A^k=V\Lambda^k V^{-1}\).
+- **Difference equations** \(x_{k+1}=Ax_k\Rightarrow x_k=A^k x_0\).
+- **Differential equations** \(u'(t)=Au(t)\Rightarrow u(t)=e^{At}u(0)\) with \(e^{At}=V e^{\Lambda t} V^{-1}\) when diagonalizable.
+
+**A clean 2×2 example**
+
+```{r}
+A <- matrix(c(2,1, 0,3),2)
+ev <- eigen(A)
+V <- ev$vectors; La <- diag(ev$values)
+La5 <- diag(diag(La)^5)
+Ak <- V %*% La5 %*% solve(V)   # A^5
+round(Ak,3)
+```
+
+**Scalar ODE motivator**: \(u'(t)=au\Rightarrow u(t)=e^{at}u(0)\).  
+**Discrete analogue**: \(x_{k+1}=ax_k\Rightarrow x_k=a^k x_0\).
+
+(Optionally mention boundary‑value problems leading to eigenpairs, e.g., discrete Laplacian.)
+
+## Worked example: stability & conditioning (2×2)
+
+Even with \(\kappa(A)\) moderate, bad pivot order can explode roundoff.
+
+```{r}
+A <- matrix(c(1e-4,1, 1,1),2,byrow=TRUE); b <- c(1,2)
+# Wrong way (no pivoting)
+naive <- function(A,b){
+  A <- A; b <- b
+  m <- A[2,1]/A[1,1]
+  A[2,] <- A[2,]-m*A[1,]; b[2] <- b[2]-m*b[1]
+  x2 <- b[2]/A[2,2]; x1 <- (b[1]-A[1,2]*x2)/A[1,1]; c(x1,x2)
+}
+x_bad <- naive(A,b)
+# Right way (partial pivoting via base solve)
+x_good <- solve(A,b)
+cbind(x_bad=round(x_bad,6), x_good=round(x_good,6))
+```
+
+## Summary (by chapter themes)
+
+- **Matrices & elimination:** solve \(Ax=b\) by triangularization/factorizations; understand runtime & pitfalls.  
+- **Subspaces & FTA:** locate solutions and their degrees of freedom.  
+- **Orthogonality:** projections, QR/Gram–Schmidt, WLS; Fourier columns are orthogonal.  
+- **Determinants:** signed volume, pivots, multiplicativity, cofactors; conceptual formulas.  
+- **Eigen:** long‑term dynamics (\(A^k\)), linear ODEs (\(e^{At}\)), diagonalization.
+
+## Appendix (optional class-time “scratch space”)
+
+### LDU to inverse (augmented system)
+
+```{r}
+A <- matrix(c(2,1,1, 1,3,2, 1,0,0),3,byrow=TRUE)
+I <- diag(3)
+aug <- cbind(A,I)
+# Do elimination steps to turn [A | I] -> [I | A^{-1}] (demo live on board or chalkboard layer)
+solve(A)
+```
+
+### Determinant as product of pivots
+
+```{r}
+set.seed(2); A <- matrix(sample(-5:5,9,TRUE),3)
+R <- qr.R(qr(A))                # R is upper-tri; diag(R) are pivots (up to row perms)
+c(det=det(A), prod_pivots=prod(diag(R)))
+```
+
+### Projection picture in \(\mathbb{R}^2\)
+
+```{r}
+#| echo: false
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(grid))
+a <- c(2,1); y <- c(1,2); yhat <- (sum(a*y)/sum(a*a))*a
+df <- rbind(data.frame(x=0,y=0,xend=a[1],yend=a[2],lab="a"),
+            data.frame(x=0,y=0,xend=y[1],yend=y[2],lab="y"),
+            data.frame(x=0,y=0,xend=yhat[1],yend=yhat[2],lab="ŷ"))
+ggplot() + geom_segment(data=df, aes(x=x,y=y,xend=xend,yend=yend),
+                        arrow=arrow(length=unit(0.02,"npc"))) +
+  annotate("text", x=c(a[1],y[1],yhat[1])*1.05, y=c(a[2],y[2],yhat[2])*1.05,
+           label=c("a","y","ŷ")) +
+  coord_fixed(xlim=c(-0.5,2.5), ylim=c(-0.5,2.5)) +
+  theme_minimal(base_size=16) +
+  theme(panel.background=element_rect(fill="#0b0f10", colour=NA),
+        plot.background=element_rect(fill="#0b0f10", colour=NA),
+        text=element_text(colour="white"), axis.text=element_text(colour="white")) +
+  ggtitle("Projection ŷ of y onto span{a}")
+```
