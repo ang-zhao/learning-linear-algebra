@@ -955,9 +955,9 @@ q_1 & q_2 \\
 \,|\, & \,|\, 
 \end{bmatrix} =
 \begin{bmatrix} 
-\frac{1}{\sqrt{3}}, & 0, \\
+\frac{1}{\sqrt{3}} & 0, \\
 \frac{1}{\sqrt{3}} & 0.7071 \\
-\frac{1}{\sqrt{3}}, & -0.7071 
+\frac{1}{\sqrt{3}} & -0.7071 
 \end{bmatrix}
 $$
 
@@ -1002,12 +1002,12 @@ q_1^\top a_1 & q_1^\top a_2 \\
 \end{bmatrix} = QR
 $$
 
-- Here $Q$ has orthonormal columns ($q^\top q = 1$)
-- $R$ collecting the projection coefficients $q_i^\top a_j$, upper triangular
+- Here $Q$ has orthonormal columns ($q_1^\top q_2 = 1$).
+- $R$ collecting the projection coefficients $q_i^\top a_j$, upper triangular.
 
 ---
 
-Geometrically $Q$ rotates the correlated columns of $A$ into perpendicular directions, $R$ rescales columns to preserving numerical stability.
+Geometrically $Q$ rotates the correlated columns of $A$ into perpendicular directions, $R$ rescales columns to preserving numerical stability. Below is the $Q$ step.
 
 ::: {.columns}
 
@@ -1231,6 +1231,11 @@ p_time
 
 ---
 
+$$
+\frac{dx}{dt} = \alpha x - \beta x y, \qquad
+\frac{dy}{dt} = \delta x y - \gamma y,
+$$
+
 Set $\alpha=1.0, \beta=0.8,  \gamma=1.5, \delta=0.5$.
 
 Earlier, we found the **equilibrium**:
@@ -1336,7 +1341,7 @@ J <- matrix(c(f1x, f1y, f2x, f2y), nrow = 2, byrow = TRUE)
 eig <- eigen(J)
 
 cat("Equilibria:\n"); print(eq_df)
-cat("\nJacobian at chosen equilibrium (K,0):\n"); print(J)
+cat("\nJacobian at chosen equilibrium (x*,y*):\n"); print(J)
 cat("\nEigenvalues:\n"); print(eig$values)
 cat("Eigenvectors:\n"); print(eig$vectors)
 
@@ -1363,6 +1368,7 @@ p_time_c + labs(title = "")
 ```
 
 ---
+
 
 Set $\alpha=1.0, \beta=0.8,  \gamma=1.5, \delta=0.5, K=1000, a=0.1$.
 
@@ -1413,7 +1419,7 @@ J <- matrix(c(f1x, f1y, f2x, f2y), nrow = 2, byrow = TRUE)
 eig <- eigen(J)
 
 #cat("Equilibria:\n"); print(eq_df)
-cat("\nJacobian at chosen equilibrium (K,0):\n"); print(J)
+cat("\nJacobian at chosen equilibrium (x*,y*):\n"); print(J)
 cat("\nEigenvalues:\n"); print(eig$values)
 cat("Eigenvectors:\n"); print(eig$vectors)
 
@@ -1567,7 +1573,7 @@ $$
 
 2. Define
 
-- **Principal componenets (eigenvectors):** $V = [v_1, \dots, v_p]$  
+- **Principal components (eigenvectors):** $V = [v_1, \dots, v_p]$  
 - **Scores:**  $Z = X V = U \Sigma$
 - **Variance explained by component $i$:** proportional to $\sigma_i^2$
 
